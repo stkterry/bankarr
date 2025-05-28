@@ -1,4 +1,4 @@
-use std::hint::black_box;
+use std::{hint::black_box};
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 
@@ -15,7 +15,7 @@ pub fn benchmark(c: &mut Criterion) {
         BenchmarkId::new("Bank", "push"),
         |b| b.iter_batched_ref(
             || Bank::<u8, 16>::new(), 
-            |bank| { black_box({ let _ = bank.push(black_box(128)); }) },
+            |bank| { black_box({ bank.push(black_box(128)); }) },
             BatchSize::SmallInput
         )
     );
@@ -23,7 +23,7 @@ pub fn benchmark(c: &mut Criterion) {
         BenchmarkId::new("Vec", "push"),
         |b| b.iter_batched_ref(
             || Vec::<u8>::with_capacity(16), 
-            |vec| { black_box({ let _ = vec.push(black_box(128)); }) },
+            |vec| { black_box({ vec.push(black_box(128)); }) },
             BatchSize::SmallInput
         )
     );
@@ -31,7 +31,7 @@ pub fn benchmark(c: &mut Criterion) {
         BenchmarkId::new("SmallVec", "push"),
         |b| b.iter_batched_ref(
             || SmallVec::<[u8; 16]>::new(), 
-            |vec| { black_box({ let _ = vec.push(black_box(128)); }) },
+            |vec| { black_box({ vec.push(black_box(128)); }) },
             BatchSize::SmallInput
         )
     );
@@ -39,7 +39,7 @@ pub fn benchmark(c: &mut Criterion) {
         BenchmarkId::new("ArrayVec", "push"),
         |b| b.iter_batched_ref(
             || ArrayVec::<u8, 16>::new(), 
-            |vec| { black_box({ let _ = vec.push(black_box(128)); }) },
+            |vec| { black_box({ vec.push(black_box(128)); }) },
             BatchSize::SmallInput
         )
     );
@@ -111,8 +111,20 @@ pub fn benchmark(c: &mut Criterion) {
             BatchSize::SmallInput
         )
     );
-    group.finish();
 
+
+    group.bench_function(
+        BenchmarkId::new("Bank", "slice"),
+        |b| b.iter_batched_ref(
+            || Bank::<u32, 16>::from(black_box([32; 8])), 
+            |bank| black_box({
+                let wut = &bank[..];
+                wut[0];
+            }), 
+            BatchSize::SmallInput
+        )
+    );
+    group.finish();
 
 }
 

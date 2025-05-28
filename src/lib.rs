@@ -1,5 +1,7 @@
 mod bank;
 
+pub(crate)mod errors;
+
 use std::{ hint::unreachable_unchecked };
 
 pub use bank::Bank;
