@@ -287,6 +287,11 @@ mod tests {
             .collect::<Vec<u32>>();
 
         assert_eq!(&collected, &[3, 4, 5]); 
+
+        let bank = Bank::<(), 3>::from([(), (), ()]);
+        let collected = bank.into_iter()
+            .collect::<Vec<()>>();
+        assert_eq!(&collected, &[(), (), ()])
     }
 
     #[test]

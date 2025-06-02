@@ -1,18 +1,23 @@
-use std::{mem::{self, MaybeUninit}, ptr::{self, NonNull}};
-
+use std::{mem::{self, MaybeUninit}, ptr::NonNull};
 
 
 pub(super) struct RawIter<T> {
     start: *const T,
     end: *const T,
+
 }
 
+
+
 impl <T> RawIter<T> {
+
+    const IS_ZST: bool = mem::size_of::<T>() == 0;
+
     pub(super) unsafe fn new(slice: &[MaybeUninit<T>]) -> Self {
         let start: *const T = slice.as_ptr().cast();
         Self {
             start,
-            end: match (mem::size_of::<T>() == 0, slice.len()) {
+            end: match (Self::IS_ZST, slice.len()) {
                 (true, count) => (slice.as_ptr() as usize + count) as *const _,
                 (_, 0) => start,
                 (_, count) => unsafe { start.add(count) }
@@ -22,31 +27,37 @@ impl <T> RawIter<T> {
 
     #[inline]
     pub(super) fn next(&mut self) -> Option<T> {
-        match (self.start == self.end, mem::size_of::<T>() == 0) {
-            (true, _) => None,
-            (_, true) => unsafe {
-                self.start = (self.start as usize + 1) as *const _;
-                Some(ptr::read(NonNull::<T>::dangling().as_ptr()))
-            },
-            (_, false) => unsafe {
-                let item = Some(ptr::read(self.start));
-                self.start = self.start.offset(1);
-                item                
-            }
-        }
+
+        if self.start == self.end { return None }
+        self.start = unsafe { self.start.offset(1) };
+
+        return None
+
+        // match (self.start == self.end, Self::IS_ZST) {
+        //     (true, _) => None,
+        //     (_, true) => unsafe {
+        //         self.end = self.end.byte_sub(1);
+        //         Some(NonNull::<T>::dangling().read())
+        //     },
+        //     (_, false) => unsafe {
+        //         let item = Some(self.start.read());
+        //         self.start = self.start.offset(1);
+        //         item                
+        //     }
+        // }
     }
 
     #[inline]
     pub(super) fn next_back(&mut self) -> Option<T> {
-        match (self.start == self.end, mem::size_of::<T>() == 0) {
+        match (self.start == self.end, Self::IS_ZST) {
             (true, _) => None,
             (_, true) => unsafe {
                 self.end = (self.end as usize - 1) as *const _;
-                Some(ptr::read(NonNull::<T>::dangling().as_ptr()))
+                Some(NonNull::<T>::dangling().read())
             },
             (_, false) => unsafe {
                 self.end = self.end.offset(-1);
-                Some(ptr::read(self.end))
+                Some(self.end.read())
             }
         }
     }

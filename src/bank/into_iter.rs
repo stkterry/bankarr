@@ -1,14 +1,17 @@
+use std::mem::ManuallyDrop;
+
 use super::{Bank, RawIter};
 
 
 pub struct IntoIter<T, const C: usize> {
-    _bank: Bank<T, C>,
+    _bank: ManuallyDrop<Bank<T, C>>,
     iter: RawIter<T>
 }
 
 impl <T, const C: usize> IntoIter<T, C> {
     #[inline]
     pub(super) const fn new(bank: Bank<T, C>, iter: RawIter<T>) -> Self {
+        let bank = ManuallyDrop::new(bank);
         Self { _bank: bank, iter }
     } 
 }
