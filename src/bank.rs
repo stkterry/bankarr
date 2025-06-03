@@ -1,12 +1,10 @@
 
 mod raw_iter;
-mod into_iter;
 mod drain;
 
 use std::{mem::{ManuallyDrop, MaybeUninit}, ops::{Deref, DerefMut}, ptr, slice};
 use crate::errors::BankFullError;
 use raw_iter::RawIter;
-use into_iter::IntoIter;
 use drain::Drain;
 
 
@@ -22,7 +20,6 @@ impl <T, const C: usize> Drop for Bank<T, C> {
                 .get_unchecked_mut(0..self.len)
                 .into_iter()
                 .for_each(|v| v.assume_init_drop());
-
         }
     }
 }
@@ -38,23 +35,12 @@ impl <T, const C: usize> DerefMut for Bank<T, C> {
     fn deref_mut(&mut self) -> &mut Self::Target { self.as_mut_slice() }
 }
 
-impl<T, const C: usize> IntoIterator for Bank<T, C> {
-    type Item = T;
-    type IntoIter = IntoIter<T, C>;
-    
-    fn into_iter(self) -> Self::IntoIter {
-        let iter = unsafe { 
-            RawIter::new(self.data.get_unchecked(0..self.len)) 
-        };
-        Self::IntoIter::new(self, iter)
-    }
-} 
 
 impl <T, const C: usize, const N: usize> From<[T; N]> for Bank<T, C> {
     fn from(arr: [T; N]) -> Self {
         assert!(N <= C);
+        
         let arr = ManuallyDrop::new(arr);
-
         let mut bank = Self {
             data: [const { MaybeUninit::uninit() }; C],
             len: N
@@ -74,18 +60,15 @@ impl <T, const C: usize> From<Vec<T>> for Bank<T, C> {
         let len = vec.len();
         assert!(len <= C);
 
-        let vec = ManuallyDrop::new(vec);
-
         let mut bank = Self {
             data: [const { MaybeUninit::uninit() }; C],
             len,
         };
 
-        unsafe { ptr::copy_nonoverlapping(
-            vec.as_ptr().cast(), 
-            bank.data.as_mut_ptr(), 
-            len
-        )}
+        bank.data
+            .iter_mut()
+            .zip(vec.into_iter())
+            .for_each(|(b, v)| { b.write(v); });
 
         bank
     }
@@ -155,9 +138,19 @@ impl <T, const C: usize> Bank<T, C> {
         }
     }
 
+    pub fn swap_remove(&mut self, index: usize) -> T {
+        assert!(index < self.len, "Index out of bounds");
+        self.len -= 1;
+        unsafe {
+            self.data.swap(index, self.len);
+            self.data.get_unchecked(self.len).assume_init_read()
+        }
+
+    }
+
     pub fn drain(&mut self) -> Drain<T> {
         let iter = unsafe { 
-            RawIter::new(self.data.get_unchecked(0..self.len)) 
+            RawIter::new(self.data.as_ptr().cast(), self.len) 
         };
         self.len = 0;
 
@@ -224,6 +217,15 @@ mod tests {
     }
 
     #[test]
+    fn swap_remove() {
+        let mut bank: Bank<String, 3> = Bank::from(["aa".to_string(), "bb".to_string(), "cc".to_string()]);
+        let removed = bank.swap_remove(0);
+
+        assert_eq!(removed, "aa".to_string());
+        assert_eq!(&bank[..], &["cc".to_string(), "bb".to_string()]);
+    }
+
+    #[test]
     #[should_panic]
     fn remove_out_of_bounds() {
         let mut bank = B::from([3, 4, 5]);
@@ -278,20 +280,6 @@ mod tests {
             .collect::<Vec<u32>>();
 
         assert_eq!(&bank[..], &collected); 
-    }
-
-    #[test]
-    fn into_iter() {
-        let bank = B::from([3, 4, 5]);
-        let collected = bank.into_iter()
-            .collect::<Vec<u32>>();
-
-        assert_eq!(&collected, &[3, 4, 5]); 
-
-        let bank = Bank::<(), 3>::from([(), (), ()]);
-        let collected = bank.into_iter()
-            .collect::<Vec<()>>();
-        assert_eq!(&collected, &[(), (), ()])
     }
 
     #[test]

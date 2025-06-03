@@ -1,4 +1,4 @@
-use std::{mem::{self, MaybeUninit}, ptr::NonNull};
+use std::{mem, ptr::NonNull};
 
 
 pub(super) struct RawIter<T> {
@@ -7,18 +7,16 @@ pub(super) struct RawIter<T> {
 
 }
 
-
-
 impl <T> RawIter<T> {
 
     const IS_ZST: bool = mem::size_of::<T>() == 0;
 
-    pub(super) unsafe fn new(slice: &[MaybeUninit<T>]) -> Self {
-        let start: *const T = slice.as_ptr().cast();
+    pub(super) unsafe fn new(start: *const T, len: usize) -> Self {
+
         Self {
             start,
-            end: match (Self::IS_ZST, slice.len()) {
-                (true, count) => (slice.as_ptr() as usize + count) as *const _,
+            end: match (Self::IS_ZST, len) {
+                (true, count) => (start as usize + count) as *const _,
                 (_, 0) => start,
                 (_, count) => unsafe { start.add(count) }
             } 
@@ -27,24 +25,18 @@ impl <T> RawIter<T> {
 
     #[inline]
     pub(super) fn next(&mut self) -> Option<T> {
-
-        if self.start == self.end { return None }
-        self.start = unsafe { self.start.offset(1) };
-
-        return None
-
-        // match (self.start == self.end, Self::IS_ZST) {
-        //     (true, _) => None,
-        //     (_, true) => unsafe {
-        //         self.end = self.end.byte_sub(1);
-        //         Some(NonNull::<T>::dangling().read())
-        //     },
-        //     (_, false) => unsafe {
-        //         let item = Some(self.start.read());
-        //         self.start = self.start.offset(1);
-        //         item                
-        //     }
-        // }
+        match (self.start == self.end, Self::IS_ZST) {
+            (true, _) => None,
+            (_, true) => unsafe {
+                self.end = self.end.byte_sub(1);
+                Some(NonNull::<T>::dangling().read())
+            },
+            (_, false) => unsafe {
+                let item = Some(self.start.read());
+                self.start = self.start.offset(1);
+                item                
+            }
+        }
     }
 
     #[inline]
