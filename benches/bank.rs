@@ -2,7 +2,7 @@ use std::{hint::black_box};
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 
-use banklist::Bank;
+use bankarr::Bank;
 use smallvec::SmallVec;
 use arrayvec::ArrayVec;
 
@@ -124,6 +124,16 @@ pub fn benchmark(c: &mut Criterion) {
             BatchSize::SmallInput
         )
     );
+
+    group.bench_function(
+        "iter",
+        |b| b.iter_batched_ref(
+            || { Bank::<u32, 16>::from(black_box([32; 8]))}, 
+            |bank| black_box(for v in bank.iter() { black_box(v); }), 
+            BatchSize::SmallInput
+        )
+    );
+
     group.finish();
 
 }

@@ -1,9 +1,14 @@
 [package]
-name = "banklist"
+name = "bankarr"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+
+keywords = ["fixed vec", "vec", "vector"]
+categories = ["data-structures"]
 
 [dependencies]
+fffl = "1.0"
 
 [dev-dependencies]
 criterion = "0.6"
