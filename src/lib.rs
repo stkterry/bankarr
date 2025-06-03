@@ -1,21 +1,8 @@
-mod bank;
-mod banklist;
-
+mod bankarr;
+mod bankvec;
 pub(crate)mod errors;
 
 
-pub use bank::Bank;
-// pub use banklist::Banklist;
+pub use bankarr::BankArr;
+pub use bankvec::BankVec;
 
-
-
-
-
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-
-}

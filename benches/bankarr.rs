@@ -2,7 +2,7 @@ use std::{hint::black_box};
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 
-use bankarr::Bank;
+use bankarr::BankArr;
 use smallvec::SmallVec;
 use arrayvec::ArrayVec;
 
@@ -14,7 +14,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         BenchmarkId::new("Bank", "push"),
         |b| b.iter_batched_ref(
-            || Bank::<u8, 16>::new(), 
+            || BankArr::<u8, 16>::new(), 
             |bank| { black_box({ bank.push(black_box(128)); }) },
             BatchSize::SmallInput
         )
@@ -48,7 +48,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         BenchmarkId::new("Bank", "pop"),
         |b| b.iter_batched_ref(
-            || { Bank::<u8, 16>::from([0, 1, 2, 3]) }, 
+            || { BankArr::<u8, 16>::from([0, 1, 2, 3]) }, 
             |bank| black_box({let _ = bank.pop(); }),
             BatchSize::SmallInput
         )
@@ -82,7 +82,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         BenchmarkId::new("Bank", "remove"),
         |b| b.iter_batched_ref(
-            || { Bank::<u8, 16>::from([0, 1, 2, 3]) }, 
+            || { BankArr::<u8, 16>::from([0, 1, 2, 3]) }, 
             |bank| black_box({let _ = bank.remove(1); }),
             BatchSize::SmallInput
         )
@@ -116,7 +116,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         BenchmarkId::new("Bank", "slice"),
         |b| b.iter_batched_ref(
-            || Bank::<u32, 16>::from(black_box([32; 8])), 
+            || BankArr::<u32, 16>::from(black_box([32; 8])), 
             |bank| black_box({
                 let wut = &bank[..];
                 wut[0];
@@ -128,7 +128,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "iter",
         |b| b.iter_batched_ref(
-            || { Bank::<u32, 16>::from(black_box([32; 8]))}, 
+            || { BankArr::<u32, 16>::from(black_box([32; 8]))}, 
             |bank| black_box(for v in bank.iter() { black_box(v); }), 
             BatchSize::SmallInput
         )

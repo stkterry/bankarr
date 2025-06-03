@@ -8,12 +8,12 @@ use raw_iter::RawIter;
 use drain::Drain;
 
 
-pub struct Bank<T, const C: usize> {
-    data: [MaybeUninit<T>; C],
-    len: usize,
+pub struct BankArr<T, const C: usize> {
+    pub(crate) data: [MaybeUninit<T>; C],
+    pub(crate) len: usize,
 }
 
-impl <T, const C: usize> Drop for Bank<T, C> {
+impl <T, const C: usize> Drop for BankArr<T, C> {
     fn drop(&mut self) {
         unsafe {
             self.data
@@ -24,19 +24,19 @@ impl <T, const C: usize> Drop for Bank<T, C> {
     }
 }
 
-impl <T, const C: usize> Deref for Bank<T, C> {
+impl <T, const C: usize> Deref for BankArr<T, C> {
     type Target = [T];
     #[inline]
     fn deref(&self) -> &Self::Target { self.as_slice() }
 }
 
-impl <T, const C: usize> DerefMut for Bank<T, C> {
+impl <T, const C: usize> DerefMut for BankArr<T, C> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target { self.as_mut_slice() }
 }
 
 
-impl <T, const C: usize, const N: usize> From<[T; N]> for Bank<T, C> {
+impl <T, const C: usize, const N: usize> From<[T; N]> for BankArr<T, C> {
     fn from(arr: [T; N]) -> Self {
         assert!(N <= C);
         
@@ -55,7 +55,7 @@ impl <T, const C: usize, const N: usize> From<[T; N]> for Bank<T, C> {
     }
 }
 
-impl <T, const C: usize> From<Vec<T>> for Bank<T, C> {
+impl <T, const C: usize> From<Vec<T>> for BankArr<T, C> {
     fn from(vec: Vec<T>) -> Self {
         let len = vec.len();
         assert!(len <= C);
@@ -74,7 +74,7 @@ impl <T, const C: usize> From<Vec<T>> for Bank<T, C> {
     }
 }
 
-impl <T, const C: usize> Bank<T, C> {
+impl <T, const C: usize> BankArr<T, C> {
 
     pub const fn new() -> Self {
         Self {
@@ -177,7 +177,7 @@ impl <T, const C: usize> Bank<T, C> {
 mod tests {
     use super::*;
 
-    type B = Bank<u32, 4>;
+    type B = BankArr<u32, 4>;
 
     #[test]
     fn push() {
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn swap_remove() {
-        let mut bank: Bank<String, 3> = Bank::from(["aa".to_string(), "bb".to_string(), "cc".to_string()]);
+        let mut bank: BankArr<String, 3> = BankArr::from(["aa".to_string(), "bb".to_string(), "cc".to_string()]);
         let removed = bank.swap_remove(0);
 
         assert_eq!(removed, "aa".to_string());
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn dropping_types() {
-        let mut bank: Bank<_, 4> = Bank::from(vec!["aa".to_string(), "bb".to_string()]);
+        let mut bank: BankArr<_, 4> = BankArr::from(vec!["aa".to_string(), "bb".to_string()]);
 
         let popped = bank.pop();
         bank.push("ff".to_string());
