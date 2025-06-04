@@ -7,10 +7,29 @@ use crate::errors::BankFullError;
 use raw_iter::RawIter;
 use drain::Drain;
 
-
+#[derive(Debug)]
 pub struct BankArr<T, const C: usize> {
     pub(crate) data: [MaybeUninit<T>; C],
     pub(crate) len: usize,
+}
+
+impl<T: PartialEq, const C: usize> PartialEq for BankArr<T, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice() && self.len == other.len
+    }
+}
+
+impl<T: Clone, const C: usize> Clone for BankArr<T, C> {
+    fn clone(&self) -> Self {
+
+        let mut data = [const { MaybeUninit::<T>::uninit() }; C];
+
+        data.iter_mut()
+            .zip(self.iter())
+            .for_each(|(b, a)| { b.write(a.clone()); });
+        
+        Self { data, len: self.len }
+    }
 }
 
 impl <T, const C: usize> Drop for BankArr<T, C> {
@@ -65,11 +84,16 @@ impl <T, const C: usize> From<Vec<T>> for BankArr<T, C> {
             len,
         };
 
+        unsafe { ptr::copy_nonoverlapping(
+            vec.as_ptr().cast(), 
+            bank.data.as_mut_ptr(), 
+            len
+        );}
+
         bank.data
             .iter_mut()
             .zip(vec.into_iter())
             .for_each(|(b, v)| { b.write(v); });
-
         bank
     }
 }
@@ -82,6 +106,10 @@ impl <T, const C: usize> BankArr<T, C> {
             len: 0,
         }
     }
+
+    #[inline(always)]
+    pub const fn len(&self) -> usize { self.len }
+
     
     #[inline]
     pub fn push(&mut self, value: T) {
@@ -114,14 +142,14 @@ impl <T, const C: usize> BankArr<T, C> {
         }
     }
 
-    pub fn insert(&mut self, index: usize, value: T) -> bool {
+    pub fn insert(&mut self, index: usize, element: T) -> bool {
         assert!(index <= self.len, "Index out of bounds");
         if self.len == C { return false }
 
         unsafe {
             let ptr = self.data.as_mut_ptr().add(index);
             ptr::copy(ptr, ptr.add(1), self.len - index);
-            ptr::write(ptr, MaybeUninit::new(value));
+            ptr::write(ptr, MaybeUninit::new(element));
         }
         self.len += 1;
         true
@@ -199,12 +227,22 @@ mod tests {
     }
 
     #[test]
+    fn try_push() {
+        let mut bank = B::from([3, 4, 5]);
+        assert!(bank.try_push(6).is_ok());
+        assert!(bank.try_push(7).is_err());
+    }
+
+    #[test]
     fn pop() {
         let mut bank = B::from([3, 4]);
         let removed = bank.pop();
 
         assert_eq!(removed, Some(4));
         assert_eq!(bank.len(), 1);
+
+        let mut bank = B::new();
+        assert_eq!(bank.pop(), None);
     }
 
     #[test]
@@ -260,6 +298,22 @@ mod tests {
 
         assert_eq!(bank.len(), 0);
         assert_eq!(drained, vec![3, 4, 5]);
+
+        let mut bank = B::from([3, 4]);
+        let mut drain = bank.drain();
+        assert_eq!(drain.next_back(), Some(4));
+        assert_eq!(drain.next(), Some(3));
+        assert_eq!(drain.next(), None);
+    }
+
+    #[test]
+    fn drain_zst() {
+        let mut bank = BankArr::<(), 2>::from([(), ()]);
+        let mut drain = bank.drain();
+        assert_eq!(drain.next(), Some(()));
+        assert_eq!(drain.next_back(), Some(()));
+        assert_eq!(drain.next(), None);
+        assert_eq!(drain.next_back(), None);
     }
 
     #[test]
@@ -285,15 +339,13 @@ mod tests {
     #[test]
     fn as_slice() {
         let bank = B::from([3, 4, 5]);
-        assert_eq!(&bank[..], bank.as_slice())
+        assert_eq!(bank.as_slice(), [3, 4, 5])
     }
 
     #[test]
     fn as_slice_mut() {
         let mut bank = B::from([3, 4, 5]);
-        let mut bank2 = B::from([3, 4, 5]);
-
-        assert_eq!(bank.as_mut_slice(), bank2.as_mut_slice());
+        assert_eq!(bank.as_mut_slice(), [3, 4, 5]);
     }
 
     #[test]
@@ -311,4 +363,9 @@ mod tests {
         assert_eq!(&bank[..], &["dd".to_string(), "ff".to_string()])
     }
 
+    #[test]
+    fn clone() {
+        let bank = BankArr::<_, 2>::from(["aa".to_string(), "bb".to_string()]);
+        assert_eq!(bank, bank.clone());
+    }
 }

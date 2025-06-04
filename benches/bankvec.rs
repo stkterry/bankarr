@@ -1,4 +1,4 @@
-use std::{hint::black_box};
+use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 

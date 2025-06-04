@@ -26,3 +26,5 @@ impl <'a, T> DoubleEndedIterator for Drain<'a, T> {
 impl <'a, T> Drop for Drain<'a, T> {
     fn drop(&mut self) { for _ in &mut *self { } }
 }
+
+

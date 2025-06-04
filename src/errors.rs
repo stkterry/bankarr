@@ -9,3 +9,15 @@ impl fmt::Display for BankFullError {
         write!(f, "bank is full")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display() {
+        let err = BankFullError {};
+
+        assert_eq!(err.to_string(), "bank is full");
+    }
+}
