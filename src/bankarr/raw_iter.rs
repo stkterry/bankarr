@@ -28,7 +28,7 @@ impl <T> RawIter<T> {
         match (self.start == self.end, Self::IS_ZST) {
             (true, _) => None,
             (_, true) => unsafe {
-                self.end = self.end.byte_sub(1);
+                self.end = (self.end as usize - 1) as *const _;
                 Some(NonNull::<T>::dangling().read())
             },
             (_, false) => unsafe {
