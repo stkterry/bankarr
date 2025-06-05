@@ -62,3 +62,9 @@ impl <T> RawIter<T> {
     }
 
 }
+
+impl<T> Drop for RawIter<T> {
+    fn drop(&mut self) {
+        while let Some(_v) = self.next() {}
+    }
+}
