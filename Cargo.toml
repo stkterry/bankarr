@@ -21,7 +21,3 @@ arrayvec = "0.7"
 [[bench]]
 name = "bankarr"
 harness = false
-
-[[bench]]
-name = "bankvec"
-harness = false

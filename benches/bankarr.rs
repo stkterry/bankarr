@@ -9,10 +9,10 @@ use arrayvec::ArrayVec;
 
 pub fn benchmark(c: &mut Criterion) {
 
-    let mut group = c.benchmark_group("Bank Perf");
-    group.sample_size(1000);
+    let mut group = c.benchmark_group("BankArr Perf");
+    group.sample_size(2000);
     group.bench_function(
-        BenchmarkId::new("Bank", "push"),
+        BenchmarkId::new("push", "BankArr"),
         |b| b.iter_batched_ref(
             || BankArr::<u8, 16>::new(), 
             |bank| { black_box({ bank.push(black_box(128)); }) },
@@ -20,7 +20,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("Vec", "push"),
+        BenchmarkId::new("push", "Vec"),
         |b| b.iter_batched_ref(
             || Vec::<u8>::with_capacity(16), 
             |vec| { black_box({ vec.push(black_box(128)); }) },
@@ -28,7 +28,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("SmallVec", "push"),
+        BenchmarkId::new("push", "SmallVec"),
         |b| b.iter_batched_ref(
             || SmallVec::<[u8; 16]>::new(), 
             |vec| { black_box({ vec.push(black_box(128)); }) },
@@ -36,7 +36,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("ArrayVec", "push"),
+        BenchmarkId::new("push", "ArrayVec"),
         |b| b.iter_batched_ref(
             || ArrayVec::<u8, 16>::new(), 
             |vec| { black_box({ vec.push(black_box(128)); }) },
@@ -45,8 +45,9 @@ pub fn benchmark(c: &mut Criterion) {
     );
 
 
+
     group.bench_function(
-        BenchmarkId::new("Bank", "pop"),
+        BenchmarkId::new("pop", "BankArr"),
         |b| b.iter_batched_ref(
             || { BankArr::<u8, 16>::from([0, 1, 2, 3]) }, 
             |bank| black_box({let _ = bank.pop(); }),
@@ -54,7 +55,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("Vec", "pop"),
+        BenchmarkId::new("pop", "Vec"),
         |b| b.iter_batched_ref(
             || { let mut vec: Vec<u8> = vec![0, 1, 2, 3]; vec.reserve_exact(12); vec }, 
             |vec| black_box({ let _ = vec.pop(); }),
@@ -62,7 +63,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("SmallVec", "pop"),
+        BenchmarkId::new("pop", "SmallVec"),
         |b| b.iter_batched_ref(
             || SmallVec::<[u8; 16]>::from_vec(vec![0, 1, 2, 3]), 
             |vec| black_box({ let _ = vec.pop(); }),
@@ -70,7 +71,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("ArrayVec", "pop"),
+        BenchmarkId::new("pop", "ArrayVec"),
         |b| b.iter_batched_ref(
             || { let mut vec = ArrayVec::<u8, 16>::new(); (0..4).for_each(|v| vec.push(v)); vec}, 
             |vec| black_box({ let _ = vec.pop(); }),
@@ -80,7 +81,7 @@ pub fn benchmark(c: &mut Criterion) {
 
 
     group.bench_function(
-        BenchmarkId::new("Bank", "remove"),
+        BenchmarkId::new("remove", "BankArr"),
         |b| b.iter_batched_ref(
             || { BankArr::<u8, 16>::from([0, 1, 2, 3]) }, 
             |bank| black_box({let _ = bank.remove(1); }),
@@ -88,7 +89,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("Vec", "remove"),
+        BenchmarkId::new("remove", "Vec"),
         |b| b.iter_batched_ref(
             || { let mut vec: Vec<u8> = vec![0, 1, 2, 3]; vec.reserve_exact(12); vec }, 
             |vec| black_box({ let _ = vec.remove(1); }),
@@ -96,7 +97,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("SmallVec", "remove"),
+        BenchmarkId::new("remove", "SmallVec"),
         |b| b.iter_batched_ref(
             || SmallVec::<[u8; 16]>::from_vec(vec![0, 1, 2, 3]), 
             |vec| black_box({ let _ = vec.remove(1); }),
@@ -104,7 +105,7 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
     group.bench_function(
-        BenchmarkId::new("ArrayVec", "remove"),
+        BenchmarkId::new("remove", "ArrayVec"),
         |b| b.iter_batched_ref(
             || { let mut vec = ArrayVec::<u8, 16>::new(); (0..4).for_each(|v| vec.push(v)); vec }, 
             |vec| black_box({ let _ = vec.remove(1); }),
@@ -112,27 +113,6 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
 
-
-    group.bench_function(
-        BenchmarkId::new("Bank", "slice"),
-        |b| b.iter_batched_ref(
-            || BankArr::<u32, 16>::from(black_box([32; 8])), 
-            |bank| black_box({
-                let wut = &bank[..];
-                wut[0];
-            }), 
-            BatchSize::SmallInput
-        )
-    );
-
-    group.bench_function(
-        "iter",
-        |b| b.iter_batched_ref(
-            || { BankArr::<u32, 16>::from(black_box([32; 8]))}, 
-            |bank| black_box(for v in bank.iter() { black_box(v); }), 
-            BatchSize::SmallInput
-        )
-    );
 
     group.finish();
 
