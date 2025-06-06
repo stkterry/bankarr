@@ -113,7 +113,6 @@ pub fn benchmark(c: &mut Criterion) {
         )
     );
 
-
     group.finish();
 
 }

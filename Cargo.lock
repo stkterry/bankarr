@@ -41,7 +41,6 @@ version = "0.2.0"
 dependencies = [
  "arrayvec",
  "criterion",
- "fffl",
  "smallvec",
 ]
 
@@ -184,12 +183,6 @@ name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
-
-[[package]]
-name = "fffl"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df6469135baf6d4dacc2e48b197102ac9bdd270ebf2d5247ef2fc98b834d937a"
 
 [[package]]
 name = "half"

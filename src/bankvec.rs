@@ -1,9 +1,101 @@
-use std::{array, hint::unreachable_unchecked, mem::{ManuallyDrop, MaybeUninit}, ops::{Deref, DerefMut, Index, IndexMut}, ptr, slice::SliceIndex};
+use std::{array, hint::unreachable_unchecked, mem::{ManuallyDrop, MaybeUninit}, ops::{Deref, DerefMut, Index, IndexMut}, ptr, slice::{self, SliceIndex}};
 
 use crate::BankArr;
 
 
-
+/// A fixed-size contiguous growable array type with spillover.
+/// 
+/// An enum with two possible backing structures, a [`BankArr`], and a [`Vec`].
+/// `BankVec` will transform between both as the stored data exceeds or shrinks 
+/// below its capacity `C`.
+/// 
+/// 
+/// # Examples
+/// ```
+/// use bankarr::BankVec;
+/// 
+/// let mut bank = BankVec::<i32, 2>::new();
+/// bank.push(3);
+/// bank.push(20);
+/// 
+/// assert!(bank.is_inline());
+/// bank.push(9); // Changes to a Vec under the hood.
+/// assert!(bank.is_dyn());
+/// 
+/// assert_eq!(bank.len(), 3);
+/// assert_eq!(bank[0], 3);
+/// 
+/// assert_eq!(bank.pop(), Some(9)); // Drops back into a BankArr
+/// assert!(bank.is_inline());
+/// assert_eq!(bank.len(), 2);
+/// 
+/// bank[0] = 19;
+/// assert_eq!(bank[0], 19);
+/// 
+/// bank.extend([21, 22]); // Again a Vec
+/// assert!(bank.is_dyn());
+/// for v in &bank {
+///     println!("{v}");
+/// }
+/// 
+/// assert_eq!(bank, [19, 20, 21, 22]); 
+/// ```
+/// 
+/// # Indexing
+/// 
+/// `BankVec` allows access to values by index just as you'd get from a vec because
+/// it implements the [`Index`] trait.
+/// 
+/// ```
+/// use bankarr::BankVec;
+/// 
+/// let bank = BankVec::<i32, 3>::from([1, 2, 3]);
+/// println!("{}", bank[1]); // prints `2`
+/// ```
+/// 
+/// Indexing out of bounds will cause a panic.
+/// ```should_panic
+/// use bankarr::BankVec;
+/// 
+/// let bank = BankVec::<i32, 3>::from([1, 2, 3]);
+/// println!("{}", bank[3]); // Panics!
+/// ``` 
+/// 
+/// # Slicing
+/// 
+/// You can easily slice `BankVec`
+/// ```
+/// use bankarr::BankVec;
+/// 
+/// fn read_slice(slice: &[i32]) {
+///     // ...
+/// }
+/// 
+/// let bank = BankVec::<i32, 3>::from([1, 2, 3]);
+/// read_slice(&bank);
+/// 
+/// // You can acquire a slice using the following as  well
+/// let u: &[i32] = &bank;
+/// let u: &[_] = &bank;
+/// // etc.
+/// 
+/// ```
+/// 
+/// # Capacity
+/// 
+/// As with a [`BankArr`], the underlying capacity is specified by its generic, `C`.
+/// Unlike `BankArr` however, is that you may continue to push into the data structure
+/// as much as you like.  The caveat is one of performance.
+/// 
+/// It takes *O*(`C`) time to move elements into a heap allocated `Vec`.  Moreover
+/// you lose the performance of a stack allocated, fixed-size structure while the 
+/// [`len`](BankArr::len) exceeds `C`. Dropping back into the fixed-size structure
+/// also has the same *O*(`C`) cost!
+/// 
+/// `BankVec` carries a small performance overhead in order to manage two possible
+/// configurations.  If you know your data won't exceed some fixed, maximum size,
+/// prefer [`BankArr`] instead. Its performance is equivalent to that of an array `[T; C]`.
+/// 
 #[derive(Debug, Clone)]
 pub enum BankVec<T, const C: usize> {
     Dyn(Vec<T>),
@@ -122,6 +214,15 @@ impl<T, const C: usize> From<Vec<T>> for BankVec<T, C> {
     }
 }
 
+impl<T, const C: usize> From<BankVec<T, C>> for Vec<T> {
+    fn from(bank_vec: BankVec<T, C>) -> Self {
+        match bank_vec {
+            BankVec::Dyn(vec) => vec,
+            BankVec::Inline(bank) => bank.into(),
+        }
+    }
+}
+
 impl <T, const C: usize> Deref for BankVec<T, C> {
     type Target = [T];
     fn deref(&self) -> &Self::Target { self.as_slice() }
@@ -145,6 +246,49 @@ impl<T, const C: usize, I: SliceIndex<[T]>> IndexMut<I> for BankVec<T, C> {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         IndexMut::index_mut(&mut **self, index)
+    }
+}
+
+impl<'a, T, const C: usize> IntoIterator for &'a BankVec<T, C> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter { self.iter() }
+}
+
+impl<'a, T, const C: usize> IntoIterator for &'a mut BankVec<T, C> {
+    type Item = &'a mut T;
+    type IntoIter = slice::IterMut<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter { self.iter_mut() }
+}
+
+impl<T, const C: usize> Extend<T> for BankVec<T, C> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, items: I) {
+        
+        match self {
+            BankVec::Dyn(vec) => vec.extend(items),
+
+            // Shockingly no UB here with ZSTs.
+            // I still very much dislike this solution.
+            BankVec::Inline(bank) => {
+                let mut iter = items.into_iter();
+
+                while bank.len() < C {
+                    match iter.next() {
+                        Some(val) => unsafe { bank.push_unchecked(val); }
+                        None => break
+                    }
+                }
+
+                let mut iter = iter.peekable();
+                if iter.peek().is_some() { 
+                    unsafe { self.into_vec_unchecked().extend(iter) }
+                }
+            },
+        }
     }
 }
 
@@ -771,6 +915,18 @@ mod tests {
         assert!(bankarr == bankarr.clone());
         assert!(bankvec == bankvec.clone());
         assert!(bankvec != bankarr);
+    }
+
+    #[test]
+    fn extend() {
+        let mut bank = B::from([0]);
+        bank.extend([0; 3]); // Should transform to Dyn variant.
+        bank.extend([0; 3]); // Checking Dyn variant branch
+
+        // Checking a ZST equivalent.
+        let mut bank = BankVec::<(), 3>::from([()]);
+        bank.extend([(); 3]);
+        bank.extend([(); 3]);
     }
 
 

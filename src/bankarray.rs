@@ -7,6 +7,103 @@ use crate::errors::BankFullError;
 use raw_iter::RawIter;
 use drain::Drain;
 
+/// A fixed-size contiguous growable array type.
+/// 
+/// Can shrink and grow up to `C` like a [`Vec`], but is fixed size in memory.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use bankarr::BankArr;
+/// 
+/// let mut bank = BankArr::<i32, 16>::new();
+/// bank.push(3);
+/// bank.push(7);
+/// 
+/// assert_eq!(bank.len(), 2);
+/// assert_eq!(bank[0], 3);
+/// 
+/// assert_eq!(bank.pop(), Some(7));
+/// assert_eq!(bank.len(), 1);
+/// 
+/// bank[0] = 19;
+/// assert_eq!(bank[0], 19);
+/// 
+/// bank.extend([20, 21]);
+/// for v in &bank {
+///     println!("{v}");
+/// }
+/// 
+/// assert_eq!(bank, [19, 20, 21]);   
+/// ```
+/// 
+/// You can build a bank using the [`From`] trait.  Note: The consumed collection
+/// may be less than or equal to the specified capacity.
+/// ```
+/// use bankarr::BankArr;
+/// // Here the bank has half its allocation remaining.
+/// let mut bank = BankArr::<i32, 4>::from([1, 2]); 
+/// assert_eq!(bank.remaining_capacity(), 2);
+/// 
+/// ```
+/// Trying to create a bank from a collection larger than its capacity will panic.
+/// ```should_panic
+/// use bankarr::BankArr;
+/// let mut bank = BankArr::<i32, 3>::from([1, 2, 3, 4]); // panics! 
+/// ```
+/// 
+/// # Indexing
+/// 
+/// `BankArr` allows access to values by index just as you'd get in a vec because
+/// it implements the [`Index`] trait.
+/// 
+/// ```
+/// use bankarr::BankArr;
+/// 
+/// let bank = BankArr::<i32, 3>::from([1, 2, 3]);
+/// println!("{}", bank[1]); // prints `2`
+/// ```
+/// 
+/// Indexing out of bounds will cause a panic.
+/// ```should_panic
+/// use bankarr::BankArr;
+/// 
+/// let bank = BankArr::<i32, 3>::from([1, 2, 3]);
+/// println!("{}", bank[3]); // Panics!
+/// ```
+/// 
+/// # Slicing
+/// 
+/// You can easily slice `BankArr`
+/// ```
+/// use bankarr::BankArr;
+/// 
+/// fn read_slice(slice: &[i32]) {
+///     // ...
+/// }
+/// 
+/// let bank = BankArr::<i32, 3>::from([1, 2, 3]);
+/// read_slice(&bank);
+/// 
+/// // You can acquire a slice using the following as  well
+/// let u: &[i32] = &bank;
+/// let u: &[_] = &bank;
+/// // etc.
+/// 
+/// ```
+/// 
+/// # Capacity
+/// 
+/// The capacity of a `BankArr` is determined by its generic, `C`.  At instantiation,
+/// the full capacity is allocated and available.  This may also mean that creating
+/// large banks can be expensive, though this is offset somewhat because the allocated
+/// space is uninitialized. 
+/// 
+/// No methods may change the capacity of the bank, much the same as an array 
+/// `[T; C]` has a fixed size.  Various methods such as [`push`](Self::push)
+/// may fail if the bank is already at capacity. Generally there are safe 
+/// alternatives, .i.e [`try_push`](Self::try_push) which return a [`Result`].
+/// 
 #[derive(Debug)]
 pub struct BankArr<T, const C: usize> {
     pub(crate) data: [MaybeUninit<T>; C],
@@ -101,6 +198,47 @@ impl<T, const C: usize, I: SliceIndex<[T]>> IndexMut<I> for BankArr<T, C> {
     }
 }
 
+
+impl<'a, T, const C: usize> IntoIterator for &'a BankArr<T, C> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter { self.iter() }
+}
+
+impl<'a, T, const C: usize> IntoIterator for &'a mut BankArr<T, C> {
+    type Item = &'a mut T;
+    type IntoIter = slice::IterMut<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter { self.iter_mut() }
+}
+
+impl<T, const C: usize> Extend<T> for BankArr<T, C> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, items: I) {
+
+        let (mut ptr, mut end) = unsafe {
+            let ptr: *mut T = self.data.as_mut_ptr().cast();
+            let end: *const T = if Self::IS_ZST { (ptr as usize + C - self.len) as _ } 
+                else { ptr.add(C) as _ };
+            (ptr.add(self.len), end)
+        };
+
+        items.into_iter().for_each(|val| {
+            match (ptr == end as _, Self::IS_ZST) {
+                (true, _) => panic!("capacity exceeded during operation `extend`"),
+                (_, true) => { end = (end as usize - 1) as _; },
+                (_, false) => unsafe {
+                    ptr.write(val);
+                    ptr = ptr.add(1);
+                }
+            }
+            self.len += 1;
+        });
+    }
+}
+
 impl <T, const C: usize, const N: usize> From<[T; N]> for BankArr<T, C> {
 
     /// Create a new instance from an array.
@@ -186,7 +324,21 @@ impl <T, const C: usize> From<Vec<T>> for BankArr<T, C> {
     }
 }
 
+impl <T, const C: usize> From<BankArr<T, C>> for Vec<T> {
+    fn from(bank: BankArr<T, C>) -> Self {
+        unsafe { 
+            bank.data
+                .get_unchecked(..bank.len)
+                .iter()
+                .map(|v| v.assume_init_read())
+                .collect()
+        }
+    }
+}
+
 impl <T, const C: usize> BankArr<T, C> {
+
+    const IS_ZST: bool = std::mem::size_of::<T>() == 0;
 
     /// Constructs a new, empty `BankArr<T, C>`
     /// 
@@ -220,6 +372,21 @@ impl <T, const C: usize> BankArr<T, C> {
     #[inline(always)]
     pub const fn len(&self) -> usize { self.len }
 
+    /// Returns the remaining capacity of the bank.
+    /// 
+    /// Simply, `C - BankArr::len`.
+    /// 
+    /// # Examples
+    /// ```
+    /// use bankarr::BankArr;
+    /// let mut bank = BankArr::<i32, 3>::new();
+    /// assert_eq!(bank.remaining_capacity(), 3);
+    /// bank.push(1);
+    /// bank.push(2);
+    /// assert_eq!(bank.remaining_capacity(), 1);
+    /// ```
+    #[inline(always)]
+    pub const fn remaining_capacity(&self) -> usize { C - self.len }
 
     /// Appends an element to the back of the collection.
     /// 
@@ -488,7 +655,6 @@ impl <T, const C: usize> BankArr<T, C> {
         unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr().cast(), self.len) }
     }
 
-
 }
 
 
@@ -499,6 +665,14 @@ mod tests {
     use super::*;
 
     type B = BankArr<u32, 4>;
+
+    #[test]
+    fn remaining_capacity() {
+        let mut bank = B::from([1, 2]);
+        assert_eq!(bank.remaining_capacity(), 2);
+        bank.push(3);
+        assert_eq!(bank.remaining_capacity(), 1);
+    }
 
     #[test]
     fn index() {
@@ -598,6 +772,32 @@ mod tests {
     }
 
     #[test]
+    fn extend() {
+        let mut bank = BankArr::<i32, 16>::from([1, 2]);
+        bank.extend([3, 4, 5]);
+
+        assert_eq!(bank, [1, 2, 3, 4, 5]);
+
+        let mut bank = BankArr::<(), 16>::from([(), ()]);
+        bank.extend([(); 4]);
+        assert_eq!(bank, [(); 6]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn extend_panics() {
+        let mut bank = BankArr::<i32, 3>::from([1, 2]);
+        bank.extend([3, 4, 5]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn extend_zst_panics() {
+        let mut bank = BankArr::<(), 3>::from([(), ()]);
+        bank.extend([(), ()]);
+    }
+
+    #[test]
     fn drain() {
         let mut bank = B::from([3, 4, 5]);
         let drained = bank.drain()
@@ -686,6 +886,5 @@ mod tests {
         assert_eq!(bank, vec.as_slice());
         assert_eq!(bank, vec);
     }
-
 
 }
