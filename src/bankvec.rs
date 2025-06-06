@@ -266,26 +266,27 @@ impl<'a, T, const C: usize> IntoIterator for &'a mut BankVec<T, C> {
 }
 
 impl<T, const C: usize> Extend<T> for BankVec<T, C> {
+
+    /// Extends a collection with the contents of an iterator.  
+    /// Will reallocate onto the heap if necessary.
     fn extend<I: IntoIterator<Item = T>>(&mut self, items: I) {
         
         match self {
             BankVec::Dyn(vec) => vec.extend(items),
-
             // Shockingly no UB here with ZSTs.
             // I still very much dislike this solution.
             BankVec::Inline(bank) => {
                 let mut iter = items.into_iter();
-
                 while bank.len() < C {
                     match iter.next() {
                         Some(val) => unsafe { bank.push_unchecked(val); }
                         None => break
                     }
                 }
-
-                let mut iter = iter.peekable();
-                if iter.peek().is_some() { 
-                    unsafe { self.into_vec_unchecked().extend(iter) }
+                if let Some(value) = iter.next() {
+                    let vec = unsafe { self.into_vec_unchecked() };
+                    vec.push(value);
+                    vec.extend(iter);
                 }
             },
         }
