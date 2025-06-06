@@ -33,4 +33,3 @@ pub(crate)mod errors;
 
 pub use bankarray::BankArr;
 pub use bankvec::BankVec;
-pub use bankvec2::BankVec as BankVec2;
