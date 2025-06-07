@@ -28,6 +28,7 @@
 
 mod bankarray;
 mod bankvec;
+mod bankvec2;
 pub(crate)mod errors;
 
 
