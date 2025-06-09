@@ -1,11 +1,8 @@
 
-mod raw_iter;
-mod drain;
 
-use std::{mem::{ManuallyDrop, MaybeUninit}, ops::{Deref, DerefMut, Index, IndexMut}, ptr, slice::{self, SliceIndex}};
-use crate::errors::BankFullError;
-use raw_iter::RawIter;
-use drain::Drain;
+use std::{mem::{ManuallyDrop, MaybeUninit}, ops::{self, Deref, DerefMut, Index, IndexMut}, ptr::{self, NonNull}, slice::{self, SliceIndex}};
+use crate::{drain, errors::BankFullError};
+
 
 /// A fixed-size contiguous growable array type.
 /// 
@@ -110,6 +107,49 @@ pub struct BankArr<T, const C: usize> {
     pub(crate) len: usize,
 }
 
+impl <T, const C: usize> Deref for BankArr<T, C> {
+    type Target = [T];
+    #[inline]
+    fn deref(&self) -> &Self::Target { &self.as_slice() }
+}
+
+impl <T, const C: usize> DerefMut for BankArr<T, C> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target { self.as_mut_slice() }
+}
+
+impl<T, const C: usize, I: SliceIndex<[T]>> Index<I> for BankArr<T, C> {
+    type Output = I::Output;
+
+    #[inline]
+    fn index(&self, index: I) -> &Self::Output {
+        Index::index(&**self, index)
+    }
+}
+
+impl<T, const C: usize, I: SliceIndex<[T]>> IndexMut<I> for BankArr<T, C> {
+    #[inline]
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        IndexMut::index_mut(&mut **self, index)
+    }
+}
+
+impl<'a, T, const C: usize> IntoIterator for &'a BankArr<T, C> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter { self.iter() }
+}
+
+impl<'a, T, const C: usize> IntoIterator for &'a mut BankArr<T, C> {
+    type Item = &'a mut T;
+    type IntoIter = slice::IterMut<'a, T>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter { self.iter_mut() }
+}
+
 impl<T: PartialEq, const C: usize> PartialEq for BankArr<T, C> {
     fn eq(&self, other: &Self) -> bool {
         self.len == other.len &&
@@ -160,61 +200,6 @@ impl<T: Clone, const C: usize> Clone for BankArr<T, C> {
     }
 }
 
-impl <T, const C: usize> Drop for BankArr<T, C> {
-    fn drop(&mut self) {
-        unsafe {
-            self.data
-                .get_unchecked_mut(0..self.len)
-                .into_iter()
-                .for_each(|v| v.assume_init_drop());
-        }
-    }
-}
-
-impl <T, const C: usize> Deref for BankArr<T, C> {
-    type Target = [T];
-    #[inline]
-    fn deref(&self) -> &Self::Target { &self.as_slice() }
-}
-
-impl <T, const C: usize> DerefMut for BankArr<T, C> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target { self.as_mut_slice() }
-}
-
-impl<T, const C: usize, I: SliceIndex<[T]>> Index<I> for BankArr<T, C> {
-    type Output = I::Output;
-
-    #[inline]
-    fn index(&self, index: I) -> &Self::Output {
-        Index::index(&**self, index)
-    }
-}
-
-impl<T, const C: usize, I: SliceIndex<[T]>> IndexMut<I> for BankArr<T, C> {
-    #[inline]
-    fn index_mut(&mut self, index: I) -> &mut Self::Output {
-        IndexMut::index_mut(&mut **self, index)
-    }
-}
-
-
-impl<'a, T, const C: usize> IntoIterator for &'a BankArr<T, C> {
-    type Item = &'a T;
-    type IntoIter = slice::Iter<'a, T>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter { self.iter() }
-}
-
-impl<'a, T, const C: usize> IntoIterator for &'a mut BankArr<T, C> {
-    type Item = &'a mut T;
-    type IntoIter = slice::IterMut<'a, T>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter { self.iter_mut() }
-}
-
 impl<T, const C: usize> Extend<T> for BankArr<T, C> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, items: I) {
 
@@ -236,6 +221,16 @@ impl<T, const C: usize> Extend<T> for BankArr<T, C> {
             }
             self.len += 1;
         });
+    }
+}
+
+#[cfg(not(tarpaulin_include))] // Drain's drop implicitly tests this
+impl<'a, T, const C: usize> drain::Drainable<'a, T> for BankArr<T, C> {
+    fn drain_parts(&'a mut self) -> (ptr::NonNull<T>, &'a mut usize) {
+        (
+            unsafe { NonNull::new_unchecked(self.data.as_mut_ptr().cast()) },
+            &mut self.len
+        )
     }
 }
 
@@ -332,6 +327,17 @@ impl <T, const C: usize> From<BankArr<T, C>> for Vec<T> {
                 .iter()
                 .map(|v| v.assume_init_read())
                 .collect()
+        }
+    }
+}
+
+impl <T, const C: usize> Drop for BankArr<T, C> {
+    fn drop(&mut self) {
+        unsafe {
+            self.data
+                .get_unchecked_mut(0..self.len)
+                .into_iter()
+                .for_each(|v| v.assume_init_drop());
         }
     }
 }
@@ -519,8 +525,8 @@ impl <T, const C: usize> BankArr<T, C> {
 
         unsafe {
             let ptr = self.data.as_mut_ptr().add(index);
-            ptr::copy(ptr, ptr.add(1), self.len - index);
-            ptr::write(ptr, MaybeUninit::new(element));
+            ptr.copy_to(ptr.add(1), self.len - index);
+            ptr.write(MaybeUninit::new(element));
         }
         self.len += 1;
         true
@@ -601,19 +607,29 @@ impl <T, const C: usize> BankArr<T, C> {
     /// use bankarr::BankArr;
     /// 
     /// let mut bank = BankArr::<i32, 3>::from([1, 2, 3]);
-    /// let drained: Vec<_> = bank.drain().collect();
+    /// let drained: Vec<_> = bank.drain(..).collect();
     /// 
     /// assert_eq!(drained, [1, 2, 3]);
     /// assert_eq!(bank.len(), 0);
     /// assert_eq!(bank, []);
     /// ```
-    pub fn drain(&mut self) -> Drain<T> {
-        let iter = unsafe { 
-            RawIter::new(self.data.as_ptr().cast(), self.len) 
-        };
-        self.len = 0;
+    pub fn drain<R>(&mut self, range: R) -> drain::Drain<T, Self> 
+    where 
+        R: ops::RangeBounds<usize>,
+    {
+        let ptr: *const T = self.data.as_ptr().cast();
+        let len = self.len;
+        let ops::Range { start, end } = drain::slice_range(range, ..len);
 
-        Drain::new(iter)
+        unsafe {
+            self.len = start;
+            drain::Drain {
+                tail_start: end,
+                tail_len: len - end,
+                iter: slice::from_raw_parts(ptr.add(start), end - start).iter(),
+                bank: NonNull::new_unchecked(self)
+            }
+        }
     }
 
     /// Extracts a slice containing the entire bank.
@@ -800,14 +816,14 @@ mod tests {
     #[test]
     fn drain() {
         let mut bank = B::from([3, 4, 5]);
-        let drained = bank.drain()
+        let drained = bank.drain(..)
             .into_iter().collect::<Vec<u32>>();
 
         assert_eq!(bank.len(), 0);
         assert_eq!(drained, vec![3, 4, 5]);
 
         let mut bank = B::from([3, 4]);
-        let mut drain = bank.drain();
+        let mut drain = bank.drain(..);
         assert_eq!(drain.next_back(), Some(4));
         assert_eq!(drain.next(), Some(3));
         assert_eq!(drain.next(), None);
@@ -816,7 +832,7 @@ mod tests {
     #[test]
     fn drain_zst() {
         let mut bank = BankArr::<(), 2>::from([(), ()]);
-        let mut drain = bank.drain();
+        let mut drain = bank.drain(..);
         assert_eq!(drain.next(), Some(()));
         assert_eq!(drain.next_back(), Some(()));
         assert_eq!(drain.next(), None);
@@ -874,6 +890,15 @@ mod tests {
     fn clone() {
         let bank = BankArr::<_, 2>::from(["aa".to_string(), "bb".to_string()]);
         assert_eq!(bank, bank.clone());
+    }
+
+    #[test]
+    fn to_vec() {
+        let bank = BankArr::<i32, 4>::from([1, 2, 3, 4]);
+
+        let vec: Vec<i32> = bank.into();
+        assert_eq!(vec, [1, 2, 3, 4]);
+
     }
 
     #[test]

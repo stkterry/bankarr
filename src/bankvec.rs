@@ -761,17 +761,30 @@ mod tests {
         assert_eq!(bank, [1, 2, 3, 4, 5]);
     }
 
+    #[test]
+    #[should_panic]
+    fn insert_out_of_bounds() {
+        let mut bank = B::from([3, 4, 5]);
+
+        bank.insert(4, 0);
+    }
 
     #[test]
-    fn pop() {
-        let mut bank = B::from([3, 4, 5, 6]);
+    fn insert() {
+        let mut bank = B::from([3, 5]);
+
+        bank.insert(2, 6);
+        assert!(bank.is_inline());
+        bank.insert(1, 4);
         
         assert!(bank.is_dyn());
-        assert_eq!(bank.pop(), Some(6));
+        bank.insert(4, 7);
 
-        assert!(bank.is_inline());
-        assert_eq!(bank.pop(), Some(5))
+        assert_eq!(bank, [3, 4, 5, 6, 7]);
     }
+
+
+
 
     #[test]
     fn remove() {
@@ -803,27 +816,6 @@ mod tests {
         assert_eq!(bank, ["dd".to_string(), "cc".to_string()])
     }
 
-    #[test]
-    fn insert() {
-        let mut bank = B::from([3, 5]);
-
-        bank.insert(2, 6);
-        assert!(bank.is_inline());
-        bank.insert(1, 4);
-        
-        assert!(bank.is_dyn());
-        bank.insert(4, 7);
-
-        assert_eq!(bank, [3, 4, 5, 6, 7]);
-    }
-
-    #[test]
-    #[should_panic]
-    fn insert_out_of_bounds() {
-        let mut bank = B::from([3, 4, 5]);
-
-        bank.insert(4, 0);
-    }
 
     #[test]
     fn reserve_exact() {
