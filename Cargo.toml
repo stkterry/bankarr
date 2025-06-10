@@ -5,7 +5,7 @@ edition = "2024"
 description = "Array-like but growable vectors"
 license = "MIT"
 readme = "README.md"
-keywords = ["array", "stack", "vector", "vec", "small", "bank"]
+keywords = ["array", "stack", "vec", "small", "bank"]
 categories = ["data-structures"]
 
 [lints.rust]
