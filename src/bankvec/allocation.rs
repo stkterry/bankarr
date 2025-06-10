@@ -30,7 +30,7 @@ pub(super) fn try_grow<T, const C: usize>(bank: &mut BankVec<T, C>, new_cap: usi
 
     if new_cap <= C {
         if !bank.on_heap() { return Ok(()) }
-
+        
         bank.buf = BufferUnion::new_stack();
         unsafe { src.copy_to_nonoverlapping(bank.buf.stack_ptr_nn(), len) }
         bank.capacity = new_cap;
@@ -100,7 +100,7 @@ mod tests {
     fn try_grow_() {
         
         let mut bank = BankVec::<i32, 4>::new();
-        try_grow(&mut bank, 3).unwrap();
+        assert!(try_grow(&mut bank, 3).is_ok());
         assert_eq!(bank.capacity, 0);
 
         
@@ -112,9 +112,9 @@ mod tests {
 
         bank.drain(3..); // drop len to less than the new capacity we want to reduce to.
 
-        try_grow(&mut bank, 3).unwrap();
+        assert!(try_grow(&mut bank, 3).is_ok());
+        assert!(!bank.on_heap());
         assert_eq!(bank.capacity, 3);
-
     }
 
 }

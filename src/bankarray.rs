@@ -204,7 +204,7 @@ impl<T, const C: usize> Extend<T> for BankArr<T, C> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, items: I) {
 
         let (mut ptr, mut end) = unsafe {
-            let ptr: *mut T = self.data.as_mut_ptr().cast();
+            let ptr: *mut T = self.as_mut_ptr();
             let end: *const T = if Self::IS_ZST { (ptr as usize + C - self.len) as _ } 
                 else { ptr.add(C) as _ };
             (ptr.add(self.len), end)
@@ -228,7 +228,7 @@ impl<T, const C: usize> Extend<T> for BankArr<T, C> {
 impl<'a, T, const C: usize> drain::Drainable<'a, T> for BankArr<T, C> {
     fn drain_parts(&'a mut self) -> (ptr::NonNull<T>, &'a mut usize) {
         (
-            unsafe { NonNull::new_unchecked(self.data.as_mut_ptr().cast()) },
+            unsafe { NonNull::new_unchecked(self.as_mut_ptr()) },
             &mut self.len
         )
     }
@@ -267,7 +267,7 @@ impl <T, const C: usize, const N: usize> From<[T; N]> for BankArr<T, C> {
         
         unsafe { ptr::copy_nonoverlapping(
             arr.as_ptr().cast(), 
-            bank.data.as_mut_ptr(), 
+            bank.as_mut_ptr(), 
             N
         )}
         bank
@@ -300,22 +300,13 @@ impl <T, const C: usize> From<Vec<T>> for BankArr<T, C> {
         let len = vec.len();
         assert!(len <= C);
 
-        let mut bank = Self {
-            data: [const { MaybeUninit::uninit() }; C],
-            len,
-        };
+        let mut data = [const {MaybeUninit::uninit() }; C];
 
-        unsafe { ptr::copy_nonoverlapping(
-            vec.as_ptr().cast(), 
-            bank.data.as_mut_ptr(), 
-            len
-        );}
-
-        bank.data
-            .iter_mut()
-            .zip(vec.into_iter())
-            .for_each(|(b, v)| { b.write(v); });
-        bank
+        for (idx, val) in vec.into_iter().enumerate() { unsafe { 
+            *data.get_unchecked_mut(idx) = MaybeUninit::new(val);
+        }}
+        
+        Self { data, len }
     }
 }
 
@@ -334,10 +325,7 @@ impl <T, const C: usize> From<BankArr<T, C>> for Vec<T> {
 impl <T, const C: usize> Drop for BankArr<T, C> {
     fn drop(&mut self) {
         unsafe {
-            self.data
-                .get_unchecked_mut(0..self.len)
-                .into_iter()
-                .for_each(|v| v.assume_init_drop());
+            ptr::slice_from_raw_parts_mut(self.as_mut_ptr(), self.len).drop_in_place();
         }
     }
 }
@@ -446,6 +434,17 @@ impl <T, const C: usize> BankArr<T, C> {
         Ok(())
     }
 
+    #[inline(always)]
+    const fn as_mut_ptr(&mut self) -> *mut T {
+        self.data.as_mut_ptr() as _
+    }
+
+    #[inline(always)]
+    const fn as_ptr(&self) -> *const T {
+        self.data.as_ptr() as _
+    }
+    
+
     /// Appends an element to the back of the collection without doing bounds 
     /// checking.
     /// 
@@ -467,9 +466,10 @@ impl <T, const C: usize> BankArr<T, C> {
     /// Takes *O*(1) time.
     #[inline(always)]
     pub unsafe fn push_unchecked(&mut self, value: T) {
-        debug_assert!(self.len < C);
-        unsafe { self.data.get_unchecked_mut(self.len).write(value); }
-        self.len += 1;
+        let len = self.len;
+        debug_assert!(len < C);
+        unsafe { self.as_mut_ptr().add(len).write(value); }
+        self.len = len + 1;
     }
 
     /// Removes the last element of the bank and returns it, or None if it is empty.
@@ -491,7 +491,8 @@ impl <T, const C: usize> BankArr<T, C> {
             true => None,
             false => unsafe {
                 self.len -= 1;
-                Some(self.data.get_unchecked_mut(self.len).assume_init_read())
+                core::hint::assert_unchecked(self.len < self.data.len());
+                Some(self.as_ptr().add(self.len).read())
             }
         }
     }
@@ -524,9 +525,9 @@ impl <T, const C: usize> BankArr<T, C> {
         if self.len == C { return false }
 
         unsafe {
-            let ptr = self.data.as_mut_ptr().add(index);
+            let ptr = self.as_mut_ptr().add(index);
             ptr.copy_to(ptr.add(1), self.len - index);
-            ptr.write(MaybeUninit::new(element));
+            ptr.write(element);
         }
         self.len += 1;
         true
@@ -556,9 +557,9 @@ impl <T, const C: usize> BankArr<T, C> {
         assert!(index < self.len, "Index out of bounds");
         self.len -= 1;
         unsafe {
-            let removed = self.data.get_unchecked(index).assume_init_read();
-            let ptr = self.data.as_mut_ptr().add(index);
-            ptr::copy(ptr.add(1), ptr, self.len - index);
+            let removed = self.as_mut_ptr().add(index).read();
+            let ptr = self.as_mut_ptr().add(index);
+            ptr.add(1).copy_to(ptr, self.len - index);
             removed
         }
     }
@@ -587,7 +588,7 @@ impl <T, const C: usize> BankArr<T, C> {
         self.len -= 1;
         unsafe {
             self.data.swap(index, self.len);
-            self.data.get_unchecked(self.len).assume_init_read()
+            self.as_ptr().add(self.len).read()
         }
 
     }
@@ -613,11 +614,12 @@ impl <T, const C: usize> BankArr<T, C> {
     /// assert_eq!(bank.len(), 0);
     /// assert_eq!(bank, []);
     /// ```
+    /// 
     pub fn drain<R>(&mut self, range: R) -> drain::Drain<T, Self> 
     where 
         R: ops::RangeBounds<usize>,
     {
-        let ptr: *const T = self.data.as_ptr().cast();
+        let ptr: *const T = self.as_ptr();
         let len = self.len;
         let ops::Range { start, end } = drain::slice_range(range, ..len);
 
@@ -648,7 +650,7 @@ impl <T, const C: usize> BankArr<T, C> {
     #[inline]
     pub const fn as_slice(&self) -> &[T] {
         // We are tracking initialized values via len, ensuring the slice is not UB
-        unsafe { slice::from_raw_parts(self.data.as_ptr().cast(), self.len) }
+        unsafe { slice::from_raw_parts(self.as_ptr(), self.len) }
     }
 
 
@@ -668,7 +670,24 @@ impl <T, const C: usize> BankArr<T, C> {
     #[inline]
     pub const fn as_mut_slice(&mut self) -> &mut [T] {
         // We are tracking initialized values via len, ensuring the slice is not UB
-        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr().cast(), self.len) }
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len) }
+    }
+
+    #[inline]
+    fn truncate(&mut self, len: usize) {
+        if len > self.len { return }
+
+        unsafe {
+            let rem = self.len - len;
+            let s = ptr::slice_from_raw_parts_mut(self.as_mut_ptr().add(len), rem);
+            self.len = len;
+            s.drop_in_place();
+        }
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.truncate(0);
     }
 
 }
@@ -912,4 +931,19 @@ mod tests {
         assert_eq!(bank, vec);
     }
 
+    #[test]
+    fn truncate() {
+        let mut bank = BankArr::<i32, 3>::from([1, 2, 3]);
+        bank.truncate(1);
+        assert_eq!(bank, [1]);
+        assert_eq!(bank.len(), 1);
+    }
+
+    #[test]
+    fn clear() {
+        let mut bank = BankArr::<i32, 3>::from([1, 2]);
+        bank.clear();
+        assert_eq!(bank, []);
+        assert_eq!(bank.len(), 0);
+    }
 }

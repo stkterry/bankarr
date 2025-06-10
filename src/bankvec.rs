@@ -333,17 +333,18 @@ impl<T, const C: usize, const N: usize> From<[T; N]> for BankVec<T, C> {
     /// assert!(bank2.on_heap());
     /// ```
     fn from(arr: [T; N]) -> Self {
-        use ptr::copy_nonoverlapping as cp;
-        
+
         let arr = ManuallyDrop::new(arr);
+        let ptr = unsafe { NonNull::new_unchecked(arr.as_ptr().cast_mut()) };
+
         if N <= C {
             let mut buf = BufferUnion::new_stack();
-            unsafe { cp(arr.as_ptr(), buf.stack_ptr_nn().as_ptr(), N); }
+            unsafe { ptr.copy_to_nonoverlapping(buf.stack_ptr_nn(), N);}
             Self { buf, capacity: N }
         } else {
             let mut bank = Self { buf: BufferUnion::new_heap(), capacity: 0, };
             bank.reserve(N);
-            unsafe { cp(arr.as_ptr(), bank.buf.heap.0.as_ptr(), N) }
+            unsafe { ptr.copy_to_nonoverlapping(bank.buf.heap.0, N);}
             bank.buf.heap.1 = N;
             
             bank
@@ -563,7 +564,10 @@ impl<T, const C: usize> BankVec<T, C> {
     /// Returns the number of elements the bank can hold without reallocating.
     /// 
     #[inline]
-    pub fn capacity(&self) -> usize { self.data_buf().2 }
+    pub fn capacity(&self) -> usize {
+        if self.on_heap() { self.capacity } else { C }
+        //self.data_buf().2 
+    }
 
 
     /// Appends an element to the back of the collection.
@@ -622,6 +626,7 @@ impl<T, const C: usize> BankVec<T, C> {
     /// index must be shifted right. In the worst cast, all elements are 
     /// shifted when insertion index is 0.  Should the new `len` exceed `C`, the
     /// data is moved to the heap.
+    /// 
     pub fn insert(&mut self, index: usize, element: T) {
         // Most of this procedure for insert was copied from the SmallVec crate.
         // I really don't understand why but, it compiles down to slightly faster

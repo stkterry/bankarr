@@ -42,3 +42,32 @@ pub(crate)mod errors;
 
 pub use bankarray::BankArr;
 pub use bankvec::BankVec;
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn readme() {
+        let mut bank = BankArr::<i32, 5>::from([1, 2]);
+        bank.push(3);
+        assert_eq!(bank, [1, 2, 3]);
+        assert_eq!(bank.pop(), Some(3));
+
+        bank.extend([3, 4, 5]);
+
+        let removed = bank.swap_remove(0);
+        assert_eq!(removed, 1);
+        assert_eq!(bank, [5, 2, 3, 4]);
+
+        // BankVec has most of the same features but can exceed its capacity
+        let mut bank = BankVec::<i32, 5>::from([1, 2, 3, 4]);
+        assert!(!bank.on_heap());
+        bank.extend([5, 6, 7, 8]);
+        assert!(bank.on_heap());
+
+        assert_eq!(bank, [1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+}

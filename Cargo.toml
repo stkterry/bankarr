@@ -1,10 +1,11 @@
 [package]
 name = "bankarr"
-version = "0.2.0"
+version = "0.7.0"
 edition = "2024"
+description = "Array-like but growable vectors"
 license = "MIT"
-
-keywords = ["fixed vec", "vec", "vector"]
+readme = "README.md"
+keywords = ["array", "stack", "vector", "vec", "small", "bank"]
 categories = ["data-structures"]
 
 [lints.rust]
@@ -18,3 +19,6 @@ arrayvec = "0.7"
 [[bench]]
 name = "bankarr"
 harness = false
+
+[lib]
+bench = false
