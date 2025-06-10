@@ -109,7 +109,7 @@ impl<'a, T: 'a, B: Drainable<'a, T>> Drop for Drain<'a, T, B> {
 #[cfg(test)]
 mod tests {
 
-    use crate::{BankArr, BankVec2};
+    use crate::{BankArr, BankVec};
 
     use super::*;
     use std::panic;
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn drain_len() {
-        let mut bank = BankVec2::<i32, 3>::from([1, 2, 3]);
+        let mut bank = BankVec::<i32, 3>::from([1, 2, 3]);
         let mut drain = bank.drain(..);
 
         assert_eq!(drain.len(), 3);
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn drain_drop() {
-        let mut bank = BankVec2::<i32, 3>::from([1, 2, 3, 4]);
+        let mut bank = BankVec::<i32, 3>::from([1, 2, 3, 4]);
 
         // Tail is greater than zero
         // Nothing more needs to be done here

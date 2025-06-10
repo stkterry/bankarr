@@ -2,15 +2,17 @@
 //! Fixed-size arrays structs with vec-like semantics.
 //! 
 //! [`BankArr<T, C>`] is a fixed-size, array struct, storing items on the stack up to `C`.
-//! [`BankVec<T, C>`] contains a fixed-size array struct as well, but can exceed `C`, switching to
-//! a heap allocated [`Vec`] when doing so. 
+//! 
+//! [`BankVec<T, C>`] is a fixed-size as well, but can exceed `C`, reallocating onto the
+//! heap when doing so.
 //! 
 //! 
 //! # Performance
 //! 
-//! `BankArr` has effectively equivalent performance of a fixed-size array, `[T; C]`, whereas `BankVec`
-//! is slightly slower, but still faster than a heap allocation while its length is below `C`. Once `BankVec`
-//! exceeds its array capacity, you can expect equivalent performance to a `Vec`.
+//! `BankArr` is about as fast as a stack-allocated array.  `BankVec` is generally
+//! faster than vec as well, but only while its capacity is equal or less than its 
+//! generic `C`.  Once `BankVec` has reallocated to the heap its generally on par
+//! with a Vec, but in some cases slower.
 //! 
 //! # Time Complexity
 //! 
@@ -19,20 +21,24 @@
 //! 
 //! In general `BankVec` will be *almost* as fast as `BankArr`, but has performance overhead for 
 //! managing its variants but especially when tranforming into a heap allocation. Spilling over `C` requires
-//! *O*(`C`) time complexity to move over to the heap, and the same cost is incurred again should the
-//! length again fall bellow `C`.
+//! *O*(`C`) time complexity to move over to the heap.
 //! 
 //! # Similar Crates
+//! 
+//! This crate was inspired heavily from a few existing crate with similar intent,
+//! namely [`SmallVec`](<https://crates.io/crates/smallvec>) and
+//! [`ArrayVec`](<https://crates.io/crates/arrayvec>).
+//! 
+//! Comparing `BankArr` with `ArrayVec` and `BankVec` with `SmallVec`, performance
+//! is generally equivalent, but in some cases this crate is favored.
 //! 
 //! 
 
 mod bankarray;
 mod bankvec;
-mod bankvec2;
 mod drain;
 pub(crate)mod errors;
 
 
 pub use bankarray::BankArr;
 pub use bankvec::BankVec;
-pub use bankvec2::BankVec as BankVec2;

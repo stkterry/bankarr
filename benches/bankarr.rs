@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
-use bankarr::{BankArr, BankVec2};
+use bankarr::{BankArr, BankVec};
 use smallvec::SmallVec;
 use arrayvec::ArrayVec;
 
@@ -22,7 +22,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || BankVec2::<i32, 16>::new(), 
+            || BankVec::<i32, 16>::new(), 
             |bank| { black_box({ bank.push(black_box(128)); }) },
             BatchSize::SmallInput
         )
@@ -67,7 +67,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || BankVec2::<u8, 16>::from([1, 2, 4, 5]), 
+            || BankVec::<u8, 16>::from([1, 2, 4, 5]), 
             |bank| black_box({ bank.insert(2, 3); }),
             BatchSize::SmallInput
         )
@@ -111,7 +111,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || BankVec2::<u8, 16>::from([0, 1, 2, 3]), 
+            || BankVec::<u8, 16>::from([0, 1, 2, 3]), 
             |bank| black_box({let _ = bank.pop(); }),
             BatchSize::SmallInput
         )
@@ -154,7 +154,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || { BankVec2::<u8, 16>::from([0, 1, 2, 3]) }, 
+            || { BankVec::<u8, 16>::from([0, 1, 2, 3]) }, 
             |bank| black_box({let _ = bank.remove(1); }),
             BatchSize::SmallInput
         )
@@ -198,7 +198,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || { BankVec2::<u8, 16>::from([0, 1, 2, 3]) }, 
+            || { BankVec::<u8, 16>::from([0, 1, 2, 3]) }, 
             |bank| black_box({let _ = bank.swap_remove(1); }),
             BatchSize::SmallInput
         )
@@ -234,7 +234,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || { BankVec2::<u8, 16>::new() }, 
+            || { BankVec::<u8, 16>::new() }, 
             |bank| { bank.extend(black_box([8u8; 8])); },
             BatchSize::SmallInput
         )
@@ -270,7 +270,7 @@ pub fn benchmark(c: &mut Criterion) {
     group.bench_function(
         "BankVec",
         |b| b.iter_batched_ref(
-            || BankVec2::<u8, 8>::from([8; 8]), 
+            || BankVec::<u8, 8>::from([8; 8]), 
             |bank| { bank.push(128); },
             BatchSize::SmallInput
         )
