@@ -58,7 +58,7 @@ Checkout the [docs](https://docs.rs/bankarr/latest/bankarr/) for more comprehens
 ## Real-World Peformance Benefits?
 
 In most circumstances a stack based vector is unlikely to yield meaningful performance
-gains.  There are however, some beneficial use-cases.  For instance, you can avoid 
+gains.  There are some beneficial use-cases, however.  For instance, you can avoid 
 pointer indirection in circumstances where you need a `Vec<Vec<T>>`, and can instead 
 use `Vec<BankVec<T>>` or even better `Vec<BankArr<T>>` when you're sure you won't 
 exceed capacity. In general you can get better cache-locality embedding either bank
