@@ -1,4 +1,4 @@
-name: Miri
+name: Miri & Tarpaulin
 on:
   push:
   pull_request:
@@ -23,7 +23,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain:  nightly-2025-06-11
-          components: miri
+          components: miri, tarpaulin
           
       - name: Run Miri
         run: cargo miri test
