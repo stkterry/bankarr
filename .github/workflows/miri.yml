@@ -39,7 +39,7 @@ jobs:
           cargo miri setup
 
       - name: Run Miri
-        run: cargo +nightly miri test
+        run: cargo miri test
         env:
           # - `tree-borrows` is required for crossbeam components.
           # - `symbolic-alignment-check` is extra checking.
