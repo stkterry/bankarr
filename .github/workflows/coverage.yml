@@ -20,6 +20,7 @@ jobs:
         uses: actions-rs/install@v0.1
         with:
           crate: cargo-tarpaulin
+          use-tool-chain: true
 
       - name: Generate code coverage
         run: cargo tarpaulin --out xml 
