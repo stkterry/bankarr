@@ -26,7 +26,7 @@ Rust's `Vec`.  Specifically you should be looking at `BankArr` vs `ArrayVec` and
 Add the following to your Cargo.toml file:
 ```rust
 [dependencies]
-bankarr = "0.7.2"
+bankarr = "0.7.4"
 ```
 
 ## Examples 
