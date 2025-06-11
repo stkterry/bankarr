@@ -23,12 +23,9 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain:  nightly-2025-06-11
-          components: miri, tarpaulin
+          components: miri
           
       - name: Run Miri
         run: cargo miri test
         env:
           MIRIFLAGS: '-Zmiri-permissive-provenance'
-
-      - name: Coverage
-        run: cargo tarpaulin --post-test-delay 10 --coveralls ${{ secrets.COVERALLS_REPO_TOKEN }}
