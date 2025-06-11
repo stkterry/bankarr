@@ -29,8 +29,3 @@ jobs:
         run: cargo miri test
         env:
           MIRIFLAGS: '-Zmiri-permissive-provenance'
-
-      - name: Coveralls
-        uses: coverallsapp/github-action@v2
-      
-    
