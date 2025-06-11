@@ -3,7 +3,8 @@
 [<img src="https://badges.ws/maintenance/yes/2025" />](https://github.com/stkterry/bankarr)
 [<img src="https://badges.ws/github/license/stkterry/bankarr" />](https://github.com/stkterry/bankarr/blob/main/LICENSE.md)
 [![Coverage Status](https://coveralls.io/repos/github/stkterry/bankarr/badge.svg?branch=main)](https://coveralls.io/github/stkterry/bankarr?branch=main)
-[<img src="https://badges.ws/badge/Miri-passing-green" />](https://github.com/rust-lang/miri)
+[![Miri](https://github.com/stkterry/bankarr/actions/workflows/miri.yaml/badge.svg)](https://github.com/stkterry/bankarr/actions/workflows/miri.yaml)
+
 # Bankarr [<img src="https://badges.ws/badge/Rust-000000?logo=rust" />](https://www.rust-lang.org)
 
 A pair of array-like vectors allowing storage on the stack.  `BankArr` is fixed-size
