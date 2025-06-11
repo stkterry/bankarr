@@ -2,7 +2,7 @@
 [<picture><img src="https://badges.ws/crates/docs/bankarr" /></picture>](https://docs.rs/bankarr/latest/bankarr/)
 [<img src="https://badges.ws/maintenance/yes/2025" />](https://github.com/stkterry/bankarr)
 [<img src="https://badges.ws/github/license/stkterry/bankarr" />](https://github.com/stkterry/bankarr/blob/main/LICENSE.md)
-[<img src="https://badges.ws/badge/test--coverage-93%-ff00" />](https://crates.io/crates/cargo-tarpaulin/)
+[![Coverage Status](https://coveralls.io/repos/github/stkterry/bankarr/badge.svg?branch=main)](https://coveralls.io/github/stkterry/bankarr?branch=main)
 [<img src="https://badges.ws/badge/Miri-passing-green" />](https://github.com/rust-lang/miri)
 # Bankarr [<img src="https://badges.ws/badge/Rust-000000?logo=rust" />](https://www.rust-lang.org)
 
@@ -58,7 +58,7 @@ Checkout the [docs](https://docs.rs/bankarr/latest/bankarr/) for more comprehens
 ## Real-World Peformance Benefits?
 
 In most circumstances a stack based vector is unlikely to yield meaningful performance
-gains.  There are however, some beneficial use-cases.  For instance, you can avoid 
+gains.  There are some beneficial use-cases, however.  For instance, you can avoid 
 pointer indirection in circumstances where you need a `Vec<Vec<T>>`, and can instead 
 use `Vec<BankVec<T>>` or even better `Vec<BankArr<T>>` when you're sure you won't 
 exceed capacity. In general you can get better cache-locality embedding either bank
