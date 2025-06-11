@@ -2,7 +2,7 @@
 [<picture><img src="https://badges.ws/crates/docs/bankarr" /></picture>](https://docs.rs/bankarr/latest/bankarr/)
 [<img src="https://badges.ws/maintenance/yes/2025" />](https://github.com/stkterry/bankarr)
 [<img src="https://badges.ws/github/license/stkterry/bankarr" />](https://github.com/stkterry/bankarr/blob/main/LICENSE.md)
-[<img src="https://badges.ws/badge/test--coverage-93%-ff00" />](https://crates.io/crates/cargo-tarpaulin/)
+[![Coverage Status](https://coveralls.io/repos/github/stkterry/bankarr/badge.svg?branch=main)](https://coveralls.io/github/stkterry/bankarr?branch=main)
 [<img src="https://badges.ws/badge/Miri-passing-green" />](https://github.com/rust-lang/miri)
 # Bankarr [<img src="https://badges.ws/badge/Rust-000000?logo=rust" />](https://www.rust-lang.org)
 
