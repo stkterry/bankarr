@@ -1,4 +1,4 @@
-name: Miri & Tarpaulin
+name: Miri
 on:
   push:
   pull_request:
