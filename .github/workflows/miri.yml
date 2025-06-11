@@ -24,21 +24,13 @@ jobs:
         with:
           toolchain:  nightly-2025-06-11
           components: miri
-
-      # - name: Prepare Miri
-      #   run: |
-      #     set -e
-      #     cat >>Cargo.toml <<EOF
-
-      #     [patch.crates-io]
-      #     crossbeam-epoch = { git = "https://github.com/crossbeam-rs/crossbeam", rev = "9e859610" }
-      #     EOF
-      #     cargo miri setup
-
+          
       - name: Run Miri
         run: cargo miri test
         env:
-          # - `tree-borrows` is required for crossbeam components.
-          # - `symbolic-alignment-check` is extra checking.
-          # - `strict-provenance` is extra checking.
           MIRIFLAGS: '-Zmiri-permissive-provenance'
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
+      
+    
