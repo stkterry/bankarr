@@ -31,4 +31,4 @@ jobs:
           MIRIFLAGS: '-Zmiri-permissive-provenance'
 
       - name: Coverage
-        run: cargo run -- tarpaulin --post-test-delay 10 --coveralls ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: cargo tarpaulin --post-test-delay 10 --coveralls ${{ secrets.COVERALLS_REPO_TOKEN }}
