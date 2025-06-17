@@ -731,10 +731,10 @@ impl<T, const C: usize> BankVec<T, C> {
         let (ptr, len, _) = self.data_buf_mut();
         assert!(index < *len, "index out of bounds");
         *len -= 1;
-        // Storing and reusing ptr.add(*len) doesn't improve performance
-        unsafe { ptr.add(index).swap(ptr.add(*len)); };
-        unsafe { ptr.add(*len).read() }
+
+        unsafe { ptr.add(index).replace(ptr.add(*len).read()) }
     }
+
 
     /// Extracts a slice containing the entire bank.
     /// 
@@ -799,6 +799,45 @@ impl<T, const C: usize> BankVec<T, C> {
     }
 }
 
+
+impl<T: PartialEq, const C: usize> BankVec<T, C> {
+
+    /// Removes the item from the bank and returns true if the item existed,
+    /// otherwise returns false.
+    /// 
+    /// Performs a [`swap_remove`](BankVec::swap_remove) on the value if found.
+    /// Does *NOT* preserve ordering.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use bankarr::BankVec;
+    /// 
+    /// let mut bank = BankVec::<i32, 4>::from([1, 2, 3, 4]);
+    /// 
+    /// assert!(bank.remove_item(&2));
+    /// assert!(!bank.remove_item(&2));
+    /// 
+    /// assert_eq!(bank, [1, 4, 3]);
+    /// ```
+    ///
+    #[inline]
+    pub fn remove_item(&mut self, value: &T) -> bool {
+        let (ptr, len, _) = self.data_buf_mut();
+        unsafe {
+            for index in 0usize..*len {
+                let cp_ptr = ptr.add(index);
+                if cp_ptr.as_ref() == value {
+                    *len -= 1;
+                    cp_ptr.replace(ptr.add(*len).read());
+                    return true
+                }                
+            }
+        }
+
+        false
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1090,5 +1129,23 @@ mod tests {
         assert_eq!(bank.len(), 1);
         assert_eq!(bank, [1]);
 
+    }
+
+    #[test]
+    fn remove_item() {
+        let mut bank = BankVec::<i32, 3>::from([1, 2, 3]);
+        assert!(bank.remove_item(&2));
+        assert!(!bank.remove_item(&2));
+
+        assert_eq!(bank.len(), 2);
+        assert_eq!(bank, [1, 3]);
+
+        let mut bank = BankVec::<String, 3>::from(["aa".to_string(), "bb".to_string(), "cc".to_string()]);
+
+        assert!(bank.remove_item(&"aa".to_string()));
+        assert!(!bank.remove_item(&"aa".to_string()));
+
+        assert_eq!(bank.len(), 2);
+        assert_eq!(bank, ["cc".to_string(), "bb".to_string()]);
     }
 }

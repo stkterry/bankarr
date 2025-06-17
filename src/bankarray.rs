@@ -264,6 +264,10 @@ impl <T, const C: usize, const N: usize> From<[T; N]> for BankArr<T, C> {
             data: [const { MaybeUninit::uninit() }; C],
             len: N
         };
+
+        //for (idx, val) in arr.into_iter().enumerate() { unsafe {
+        //    *bank.data.get_unchecked_mut(idx) = MaybeUninit::new(val);
+        //}}
         
         unsafe { ptr::copy_nonoverlapping(
             arr.as_ptr().cast(), 
@@ -587,8 +591,8 @@ impl <T, const C: usize> BankArr<T, C> {
         assert!(index < self.len, "Index out of bounds");
         self.len -= 1;
         unsafe {
-            self.data.swap(index, self.len);
-            self.as_ptr().add(self.len).read()
+            let ptr = self.data.as_mut_ptr();
+            ptr.add(index).replace(ptr.add(self.len).read()).assume_init()
         }
 
     }
@@ -615,7 +619,7 @@ impl <T, const C: usize> BankArr<T, C> {
     /// assert_eq!(bank, []);
     /// ```
     /// 
-    pub fn drain<R>(&mut self, range: R) -> drain::Drain<T, Self> 
+    pub fn drain<R>(&mut self, range: R) -> drain::Drain<'_, T, Self> 
     where 
         R: ops::RangeBounds<usize>,
     {
@@ -690,6 +694,47 @@ impl <T, const C: usize> BankArr<T, C> {
         self.truncate(0);
     }
 
+}
+
+impl<T: PartialEq, const C: usize> BankArr<T, C> {
+
+
+    /// Removes the item from the bank and returns true if the item existed,
+    /// otherwise returns false.
+    /// 
+    /// Performs a [`swap_remove`](BankArr::swap_remove) on the value if found.
+    /// Does *NOT* preserve ordering.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use bankarr::BankArr;
+    /// 
+    /// let mut bank = BankArr::<i32, 4>::from([1, 2, 3, 4]);
+    /// 
+    /// assert!(bank.remove_item(&2));
+    /// assert!(!bank.remove_item(&2));
+    /// 
+    /// assert_eq!(bank, [1, 4, 3]);
+    /// ```
+    ///
+    #[inline]
+    pub fn remove_item(&mut self, value: &T) -> bool {
+        unsafe {
+            let ptr: NonNull<T> = NonNull::new_unchecked(self.data.as_mut_ptr().cast());
+
+            for index in 0usize..self.len {
+                let cp_ptr = ptr.add(index);
+                if cp_ptr.as_ref() == value {
+                    self.len -= 1;
+                    cp_ptr.replace(ptr.add(self.len).read());
+                    return true
+                }
+            }
+        }
+
+        false
+    }
 }
 
 
@@ -945,5 +990,23 @@ mod tests {
         bank.clear();
         assert_eq!(bank, []);
         assert_eq!(bank.len(), 0);
+    }
+
+    #[test]
+    fn remove_item() {
+        let mut bank = BankArr::<i32, 3>::from([1, 2, 3]);
+        assert!(bank.remove_item(&2));
+        assert!(!bank.remove_item(&2));
+
+        assert_eq!(bank.len(), 2);
+        assert_eq!(bank, [1, 3]);
+
+        let mut bank = BankArr::<String, 3>::from(["aa".to_string(), "bb".to_string(), "cc".to_string()]);
+
+        assert!(bank.remove_item(&"aa".to_string()));
+        assert!(!bank.remove_item(&"aa".to_string()));
+
+        assert_eq!(bank.len(), 2);
+        assert_eq!(bank, ["cc".to_string(), "bb".to_string()]);
     }
 }

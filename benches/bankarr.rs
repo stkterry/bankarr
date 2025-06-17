@@ -232,6 +232,26 @@ pub fn benchmark(c: &mut Criterion) {
     );
     group.finish();
 
+    let mut group = c.benchmark_group("remove_item");
+    group.sample_size(2000);
+    group.bench_function(
+        "BankArr",
+        |b| b.iter_batched_ref(
+            || { BankArr::<i32, 16>::from([0, 1, 2, 3]) }, 
+            |bank| black_box({let _ = bank.remove_item(&1); }),
+            BatchSize::SmallInput
+        )
+    );
+    group.bench_function(
+        "BankVec",
+        |b| b.iter_batched_ref(
+            || { BankVec::<i32, 16>::from([0, 1, 2, 3]) }, 
+            |bank| black_box({let _ = bank.remove_item(&1); }),
+            BatchSize::SmallInput
+        )
+    );
+    group.finish();
+
 
     let mut group = c.benchmark_group("extend");
     group.sample_size(2000);
